@@ -1,300 +1,320 @@
-import { EntityId, Id, Snapshot } from "./types";
 import { Event } from "./event";
-import { Group, GroupImpl } from "./group";
-import { Query } from "./query";
+import { type Group, GroupImpl } from "./group";
 import { Prefab } from "./prefab";
+import type { Query } from "./query";
 import { createSnapshot } from "./snapshot";
+import type { EntityId, Id, Snapshot } from "./types";
 import { deepClone } from "./utils";
 
 export interface World {
-    spawn(): EntityId;
-    despawn(entity: EntityId): boolean;
-    valid(entity: EntityId): boolean;
+	spawn(): EntityId;
+	despawn(entity: EntityId): boolean;
+	valid(entity: EntityId): boolean;
 
-    set<T>(entity: EntityId, component: Id<T>, value: T): void;
-    get<T>(entity: EntityId, component: Id<T>): T | undefined;
-    has(entity: EntityId, component: Id): boolean;
-    remove(entity: EntityId, component: Id): boolean;
+	set<T>(entity: EntityId, component: Id<T>, value: T): void;
+	get<T>(entity: EntityId, component: Id<T>): T | undefined;
+	has(entity: EntityId, component: Id): boolean;
+	remove(entity: EntityId, component: Id): boolean;
 
-    query<T extends unknown[]>(...components: { [K in keyof T]: Id<T[K]> }): Query<T>;
+	query<T extends unknown[]>(
+		...components: { [K in keyof T]: Id<T[K]> }
+	): Query<T>;
 
-    createGroup(): Group;
-    removeGroup(group: Group): void;
-    getGroupsForEntity(entity: EntityId): Group[];
-    getGroupsWithComponent(component: Id): Group[];
+	createGroup(): Group;
+	removeGroup(group: Group): void;
+	getGroupsForEntity(entity: EntityId): Group[];
+	getGroupsWithComponent(component: Id): Group[];
 
-    snapshot(components?: Id[]): Snapshot;
-    revert(snapshot: Snapshot): void;
+	snapshot(components?: Id[]): Snapshot | undefined;
+	revert(snapshot: Snapshot): void;
 
-    prefab(components: Array<[Id, any]>): Prefab;
+	prefab(components: Array<[Id, unknown]>): Prefab;
 
-    // Custom events
-    onEntitySpawned: Event<[EntityId]>;
-    onEntityDespawned: Event<[EntityId]>;
-    onComponentAdded: Event<[EntityId, Id]>;
-    onComponentRemoved: Event<[EntityId, Id]>;
-    onEntityAddedToGroup: Event<[EntityId, Group]>;
-    onEntityRemovedFromGroup: Event<[EntityId, Group]>;
+	// Custom events
+	onEntitySpawned: Event<[EntityId]>;
+	onEntityDespawned: Event<[EntityId]>;
+	onComponentAdded: Event<[EntityId, Id]>;
+	onComponentRemoved: Event<[EntityId, Id]>;
+	onEntityAddedToGroup: Event<[EntityId, Group]>;
+	onEntityRemovedFromGroup: Event<[EntityId, Group]>;
 }
 
 export class WorldImpl implements World {
-    private nextEntityId = 1;
-    private entities = new Set<EntityId>();
-    private components = new Map<EntityId, Map<Id, unknown>>();
-    private groups = new Set<GroupImpl>();
-    private entityToGroups = new Map<EntityId, Set<GroupImpl>>();
+	private nextEntityId = 1;
+	private entities = new Set<EntityId>();
+	private components = new Map<EntityId, Map<Id, unknown>>();
+	private groups = new Set<GroupImpl>();
+	private entityToGroups = new Map<EntityId, Set<GroupImpl>>();
 
-    public onEntitySpawned = new Event<[EntityId]>();
-    public onEntityDespawned = new Event<[EntityId]>();
-    public onComponentAdded = new Event<[EntityId, Id]>();
-    public onComponentRemoved = new Event<[EntityId, Id]>();
-    public onEntityAddedToGroup = new Event<[EntityId, Group]>();
-    public onEntityRemovedFromGroup = new Event<[EntityId, Group]>();
+	public onEntitySpawned = new Event<[EntityId]>();
+	public onEntityDespawned = new Event<[EntityId]>();
+	public onComponentAdded = new Event<[EntityId, Id]>();
+	public onComponentRemoved = new Event<[EntityId, Id]>();
+	public onEntityAddedToGroup = new Event<[EntityId, Group]>();
+	public onEntityRemovedFromGroup = new Event<[EntityId, Group]>();
 
-    spawn(): EntityId {
-        const entity = this.nextEntityId++ as EntityId;
-        this.entities.add(entity);
-        this.components.set(entity, new Map());
-        this.onEntitySpawned.fire(entity);
-        return entity;
-    }
+	spawn(): EntityId {
+		const entity = this.nextEntityId++ as EntityId;
+		this.entities.add(entity);
+		this.components.set(entity, new Map());
+		this.onEntitySpawned.fire(entity);
+		return entity;
+	}
 
-    despawn(entity: EntityId): boolean {
-        if (!this.valid(entity)) return false;
+	despawn(entity: EntityId): boolean {
+		if (!this.valid(entity)) return false;
 
-        const groups = this.entityToGroups.get(entity);
-        if (groups) {
-            for (const group of groups) {
-                group.removeEntity(entity);
-                this.onEntityRemovedFromGroup.fire(entity, group);
-            }
-            this.entityToGroups.delete(entity);
-        }
+		const groups = this.entityToGroups.get(entity);
+		if (groups) {
+			for (const group of groups) {
+				group.removeEntity(entity);
+				this.onEntityRemovedFromGroup.fire(entity, group);
+			}
+			this.entityToGroups.delete(entity);
+		}
 
-        const comps = this.components.get(entity)!;
-        for (const [comp] of comps) {
-            this.onComponentRemoved.fire(entity, comp);
-        }
-        this.entities.delete(entity);
-        this.components.delete(entity);
-        this.onEntityDespawned.fire(entity);
-        return true;
-    }
+		const comps = this.components.get(entity);
+		if (!comps) return false;
 
-    valid(entity: EntityId): boolean {
-        return this.entities.has(entity);
-    }
+		for (const [comp] of comps) {
+			this.onComponentRemoved.fire(entity, comp);
+		}
+		this.entities.delete(entity);
+		this.components.delete(entity);
+		this.onEntityDespawned.fire(entity);
+		return true;
+	}
 
-    set<T>(entity: EntityId, component: Id<T>, value: T): void {
-        if (!this.valid(entity)) error(`Entity ${entity} does not exist`);
-        const comps = this.components.get(entity)!;
-        const had = comps.has(component);
-        comps.set(component, value);
-        if (!had) this.onComponentAdded.fire(entity, component);
-    }
+	valid(entity: EntityId): boolean {
+		return this.entities.has(entity);
+	}
 
-    get<T>(entity: EntityId, component: Id<T>): T | undefined {
-        if (!this.valid(entity)) return undefined;
+	set<T>(entity: EntityId, component: Id<T>, value: T): void {
+		if (!this.valid(entity)) error(`Entity ${entity} does not exist`);
+		const comps = this.components.get(entity);
+		if (!comps) return;
+		const had = comps.has(component);
+		comps.set(component, value);
+		if (!had) this.onComponentAdded.fire(entity, component);
+	}
 
-        const entityComps = this.components.get(entity);
-        if (entityComps?.has(component)) {
-            return entityComps.get(component) as T;
-        }
+	get<T>(entity: EntityId, component: Id<T>): T | undefined {
+		if (!this.valid(entity)) return undefined;
 
-        const groups = this.entityToGroups.get(entity);
-        if (groups) {
-            for (const group of groups) {
-                if (group.has(component)) {
-                    return group.get(component);
-                }
-            }
-        }
+		const entityComps = this.components.get(entity);
+		if (entityComps?.has(component)) {
+			return entityComps.get(component) as T;
+		}
 
-        return undefined;
-    }
+		const groups = this.entityToGroups.get(entity);
+		if (groups) {
+			for (const group of groups) {
+				if (group.has(component)) {
+					return group.get(component);
+				}
+			}
+		}
 
-    has(entity: EntityId, component: Id): boolean {
-        if (!this.valid(entity)) return false;
+		return undefined;
+	}
 
-        const entityComps = this.components.get(entity);
-        if (entityComps?.has(component)) {
-            return true;
-        }
+	has(entity: EntityId, component: Id): boolean {
+		if (!this.valid(entity)) return false;
 
-        const groups = this.entityToGroups.get(entity);
-        if (groups) {
-            for (const group of groups) {
-                if (group.has(component)) {
-                    return true;
-                }
-            }
-        }
+		const entityComps = this.components.get(entity);
+		if (entityComps?.has(component)) {
+			return true;
+		}
 
-        return false;
-    }
+		const groups = this.entityToGroups.get(entity);
+		if (groups) {
+			for (const group of groups) {
+				if (group.has(component)) {
+					return true;
+				}
+			}
+		}
 
-    remove(entity: EntityId, component: Id): boolean {
-        if (!this.valid(entity)) return false;
+		return false;
+	}
 
-        const comps = this.components.get(entity)!;
-        const had = comps.delete(component);
-        if (had) {
-            this.onComponentRemoved.fire(entity, component);
-        }
-        return had;
-    }
+	remove(entity: EntityId, component: Id): boolean {
+		if (!this.valid(entity)) return false;
 
-    query<T extends unknown[]>(...components: { [K in keyof T]: Id<T[K]> }): Query<T> {
-        const required: Id[] = [];
-        const excluded: Id[] = [];
+		const comps = this.components.get(entity);
+		if (!comps) return false;
 
-        for (const c of components) {
-            required.push(c);
-        }
+		const had = comps.delete(component);
+		if (had) {
+			this.onComponentRemoved.fire(entity, component);
+		}
+		return had;
+	}
 
-        const world = this;
+	query<T extends unknown[]>(
+		...components: { [K in keyof T]: Id<T[K]> }
+	): Query<T> {
+		const required: Id[] = [];
+		const excluded: Id[] = [];
 
-        const query: Query<T> = {
-            with<U extends unknown[]>(...newComps: { [K in keyof U]: Id<U[K]> }): Query<[...T, ...U]> {
-                for (const comp of newComps) {
-                    required.push(comp);
-                }
-                return query as unknown as Query<[...T, ...U]>;
-            },
+		for (const c of components) {
+			required.push(c);
+		}
 
-            without(...ex: Id[]): Query<T> {
-                for (const comp of ex) {
-                    excluded.push(comp);
-                }
-                return query;
-            },
+		const world = this;
 
-            each(cb: (entity: EntityId, ...components: T) => void): void {
-                for (const entity of world.entities) {
-                    const comps = world.components.get(entity)!;
-                    const hasAll = required.every((c) => comps.has(c));
-                    const hasEx = excluded.some((c) => comps.has(c));
-                    if (hasAll && !hasEx) {
-                        const values = required.map(c => comps.get(c)) as T;
-                        cb(entity, ...values);
-                    }
-                }
-            },
+		const query: Query<T> = {
+			with<U extends unknown[]>(
+				...newComps: { [K in keyof U]: Id<U[K]> }
+			): Query<[...T, ...U]> {
+				for (const comp of newComps) {
+					required.push(comp);
+				}
+				return query as unknown as Query<[...T, ...U]>;
+			},
 
-            collect(): Array<[EntityId, ...T]> {
-                const results: Array<[EntityId, ...T]> = [];
-                query.each((entity: EntityId, ...vals: T) => {
-                    results.push([entity, ...vals] as [EntityId, ...T]);
-                });
-                return results;
-            },
+			without(...ex: Id[]): Query<T> {
+				for (const comp of ex) {
+					excluded.push(comp);
+				}
+				return query;
+			},
 
-            map<U>(fn: (entry: [EntityId, ...T]) => U): U[] {
-                return query.collect().map(fn);
-            },
-            filter(fn: (entry: [EntityId, ...T]) => boolean): Array<[EntityId, ...T]> {
-                return query.collect().filter(fn);
-            }
-        };
+			each(cb: (entity: EntityId, ...components: T) => void): void {
+				for (const entity of world.entities) {
+					const comps = world.components.get(entity);
+					if (!comps) return;
 
-        return query;
-    }
+					const hasAll = required.every((c) => comps.has(c));
+					const hasEx = excluded.some((c) => comps.has(c));
+					if (hasAll && !hasEx) {
+						const values = required.map((c) => comps.get(c)) as T;
+						cb(entity, ...values);
+					}
+				}
+			},
 
-    snapshot(components?: Id[]): Snapshot {
-        return createSnapshot(this.entities, this.components, components);
-    }
+			collect(): Array<[EntityId, ...T]> {
+				const results: Array<[EntityId, ...T]> = [];
+				query.each((entity: EntityId, ...vals: T) => {
+					results.push([entity, ...vals] as [EntityId, ...T]);
+				});
+				return results;
+			},
 
-    createGroup(): Group {
-        const group = new GroupImpl();
-        this.groups.add(group);
+			map<U>(fn: (entry: [EntityId, ...T]) => U): U[] {
+				return query.collect().map(fn);
+			},
+			filter(
+				fn: (entry: [EntityId, ...T]) => boolean,
+			): Array<[EntityId, ...T]> {
+				return query.collect().filter(fn);
+			},
+		};
 
-        group.onEntityAdded.connect((entity) => {
-            if (!this.entityToGroups.has(entity)) {
-                this.entityToGroups.set(entity, new Set());
-            }
-            this.entityToGroups.get(entity)?.add(group);
-            this.onEntityAddedToGroup.fire(entity, group);
-        });
+		return query;
+	}
 
-        group.onEntityRemoved.connect((entity) => {
-            this.entityToGroups.get(entity)?.delete(group);
-            if (this.entityToGroups.get(entity)?.size() === 0) {
-                this.entityToGroups.delete(entity);
-            }
-            this.onEntityRemovedFromGroup.fire(entity, group);
-        });
+	snapshot(components?: Id[]): Snapshot | undefined {
+		return createSnapshot(this.entities, this.components, components);
+	}
 
-        return group;
-    }
+	createGroup(): Group {
+		const group = new GroupImpl();
+		this.groups.add(group);
 
-    removeGroup(group: Group): void {
-        if (!(group instanceof GroupImpl) || !this.groups.has(group)) return;
+		group.onEntityAdded.connect((entity) => {
+			if (!this.entityToGroups.has(entity)) {
+				this.entityToGroups.set(entity, new Set());
+			}
+			this.entityToGroups.get(entity)?.add(group);
+			this.onEntityAddedToGroup.fire(entity, group);
+		});
 
-        for (const entity of group.getEntities()) {
-            group.removeEntity(entity);
-        }
+		group.onEntityRemoved.connect((entity) => {
+			this.entityToGroups.get(entity)?.delete(group);
+			if (this.entityToGroups.get(entity)?.size() === 0) {
+				this.entityToGroups.delete(entity);
+			}
+			this.onEntityRemovedFromGroup.fire(entity, group);
+		});
 
-        this.groups.delete(group);
-    }
+		return group;
+	}
 
-    prefab(components: Array<[Id, unknown]>): Prefab {
-        return new Prefab(this, components);
-    }
+	removeGroup(group: Group): void {
+		if (!(group instanceof GroupImpl) || !this.groups.has(group)) return;
 
-    getGroupsForEntity(entity: EntityId): Group[] {
-        const groups = this.entityToGroups.get(entity);
-        return groups ? [...groups] : [];
-    }
+		for (const entity of group.getEntities()) {
+			group.removeEntity(entity);
+		}
 
-    getGroupsWithComponent(component: Id): Group[] {
-        const result: Group[] = [];
-        for (const group of this.groups) {
-            if (group.has(component)) {
-                result.push(group);
-            }
-        }
-        return result;
-    }
+		this.groups.delete(group);
+	}
 
-    revert(snapshot: Snapshot): void {
-        const isPartial = snapshot.components && snapshot.components.size() > 0;
+	prefab(components: Array<[Id, unknown]>): Prefab {
+		return new Prefab(this, components);
+	}
 
-        if (!isPartial) {
-            for (const entity of [...this.entities]) {
-                if (!snapshot.entityStates.has(entity)) this.despawn(entity);
-            }
-        }
+	getGroupsForEntity(entity: EntityId): Group[] {
+		const groups = this.entityToGroups.get(entity);
+		return groups ? [...groups] : [];
+	}
 
-        for (const [entity, snapshotComps] of snapshot.entityStates) {
-            if (!this.entities.has(entity)) {
-                if (snapshotComps.size() > 0) {
-                    this.entities.add(entity);
-                    this.components.set(entity, new Map());
-                    this.onEntitySpawned.fire(entity);
-                } else {
-                    continue;
-                }
-            }
+	getGroupsWithComponent(component: Id): Group[] {
+		const result: Group[] = [];
+		for (const group of this.groups) {
+			if (group.has(component)) {
+				result.push(group);
+			}
+		}
+		return result;
+	}
 
-            const currentComps = this.components.get(entity)!;
+	revert(snapshot: Snapshot): void {
+		const isPartial = snapshot.components && snapshot.components.size() > 0;
 
-            if (!isPartial) {
-                for (const [id] of currentComps) {
-                    if (!snapshotComps.has(id)) {
-                        currentComps.delete(id);
-                        this.onComponentRemoved.fire(entity, id);
-                    }
-                }
-            }
+		if (!isPartial) {
+			for (const entity of [...this.entities]) {
+				if (!snapshot.entityStates.has(entity)) this.despawn(entity);
+			}
+		}
 
-            for (const [id, val] of snapshotComps) {
-                if (!isPartial || !snapshot.components || snapshot.components.includes(id)) {
-                    currentComps.set(id, deepClone(val));
-                    this.onComponentAdded.fire(entity, id);
-                }
-            }
-        }
-    }
+		for (const [entity, snapshotComps] of snapshot.entityStates) {
+			if (!this.entities.has(entity)) {
+				if (snapshotComps.size() > 0) {
+					this.entities.add(entity);
+					this.components.set(entity, new Map());
+					this.onEntitySpawned.fire(entity);
+				} else {
+					continue;
+				}
+			}
+
+			const currentComps = this.components.get(entity);
+			if (!currentComps) return;
+
+			if (!isPartial) {
+				for (const [id] of currentComps) {
+					if (!snapshotComps.has(id)) {
+						currentComps.delete(id);
+						this.onComponentRemoved.fire(entity, id);
+					}
+				}
+			}
+
+			for (const [id, val] of snapshotComps) {
+				if (
+					!isPartial ||
+					!snapshot.components ||
+					snapshot.components.includes(id)
+				) {
+					currentComps.set(id, deepClone(val));
+					this.onComponentAdded.fire(entity, id);
+				}
+			}
+		}
+	}
 }
 
 // ==============================================
@@ -302,5 +322,5 @@ export class WorldImpl implements World {
 // ==============================================
 
 export function createWorld(): World {
-    return new WorldImpl();
+	return new WorldImpl();
 }
