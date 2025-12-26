@@ -1,13 +1,6 @@
 import type { Id } from "./types";
 
-/**
- * Registry for component names to their assigned IDs
- */
 const componentRegistry = new Map<string, Id>();
-
-/**
- * Counter for generating unique component IDs
- */
 let nextComponentId = 1;
 
 /**

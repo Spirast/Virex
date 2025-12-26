@@ -162,23 +162,11 @@ export interface World {
 	prefab(components: Array<[Id, unknown]>): Prefab;
 
 	// Events
-
-	/** Event fired when an entity is spawned */
 	onEntitySpawned: Event<[EntityId]>;
-
-	/** Event fired when an entity is despawned */
 	onEntityDespawned: Event<[EntityId]>;
-
-	/** Event fired when a component is added to an entity */
 	onComponentAdded: Event<[EntityId, Id]>;
-
-	/** Event fired when a component is removed from an entity */
 	onComponentRemoved: Event<[EntityId, Id]>;
-
-	/** Event fired when an entity is added to a group */
 	onEntityAddedToGroup: Event<[EntityId, Group]>;
-
-	/** Event fired when an entity is removed from a group */
 	onEntityRemovedFromGroup: Event<[EntityId, Group]>;
 }
 
@@ -187,37 +175,16 @@ export interface World {
  * Manages entities, components, groups, and provides the core ECS functionality.
  */
 export class WorldImpl implements World {
-	/** Counter for generating unique entity IDs */
 	private nextEntityId = 1;
-
-	/** Set of all valid entities in this world */
 	private entities = new Set<EntityId>();
-
-	/** Map of entity IDs to their component data */
 	private components = new Map<EntityId, Map<Id, unknown>>();
-
-	/** Set of all groups in this world */
 	private groups = new Set<GroupImpl>();
-
-	/** Map of entity IDs to the groups they belong to */
 	private entityToGroups = new Map<EntityId, Set<GroupImpl>>();
-
-	/** Event fired when an entity is spawned */
 	public onEntitySpawned = new Event<[EntityId]>();
-
-	/** Event fired when an entity is despawned */
 	public onEntityDespawned = new Event<[EntityId]>();
-
-	/** Event fired when a component is added to an entity */
 	public onComponentAdded = new Event<[EntityId, Id]>();
-
-	/** Event fired when a component is removed from an entity */
 	public onComponentRemoved = new Event<[EntityId, Id]>();
-
-	/** Event fired when an entity is added to a group */
 	public onEntityAddedToGroup = new Event<[EntityId, Group]>();
-
-	/** Event fired when an entity is removed from a group */
 	public onEntityRemovedFromGroup = new Event<[EntityId, Group]>();
 
 	/**

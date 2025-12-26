@@ -32,9 +32,6 @@ export function createSnapshot(
 	componentsMap: Map<EntityId, Map<Id, unknown>>,
 	components?: Id[],
 ): Snapshot | undefined {
-	/**
-	 * Map of entity IDs to their component states
-	 */
 	const entityStates = new Map<EntityId, Map<Id, unknown>>();
 
 	// Process each entity in the set
@@ -42,25 +39,18 @@ export function createSnapshot(
 		const comps = componentsMap.get(entity);
 		if (!comps) return; // Skip if entity has no components
 
-		/**
-		 * Map to store cloned component values for this entity
-		 */
 		const cloned = new Map<Id, unknown>();
 
-		// If specific components are requested, only include those
 		if (components && components.size() > 0) {
 			for (const id of components) {
 				if (comps.has(id)) {
-					// Deep clone the component value to prevent reference issues
 					cloned.set(id, deepClone(comps.get(id)));
 				}
 			}
-			// Only include the entity if it has any of the requested components
 			if (cloned.size() > 0) {
 				entityStates.set(entity, cloned);
 			}
 		} else {
-			// Include all components for the entity
 			for (const [id, val] of comps) {
 				cloned.set(id, deepClone(val));
 			}

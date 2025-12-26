@@ -17,13 +17,8 @@ import type { EntityId, Id } from "./types";
  * ```
  */
 export interface Group {
-	/** Unique identifier for this group */
 	readonly id: number;
-
-	/** Event fired when an entity is added to this group */
 	onEntityAdded: Event<[EntityId]>;
-
-	/** Event fired when an entity is removed from this group */
 	onEntityRemoved: Event<[EntityId]>;
 
 	/**
@@ -95,22 +90,11 @@ export interface Group {
  * Manages entity membership and shared component values.
  */
 export class GroupImpl implements Group {
-	/** Static counter for generating unique group IDs */
 	private static nextId = 1;
-
-	/** Unique identifier for this group */
 	public readonly id: number;
-
-	/** Set of entities in this group */
 	private entities = new Set<EntityId>();
-
-	/** Map of component IDs to their values for this group */
 	private components = new Map<Id, unknown>();
-
-	/** Event fired when an entity is added to this group */
 	public onEntityAdded = new Event<[EntityId]>();
-
-	/** Event fired when an entity is removed from this group */
 	public onEntityRemoved = new Event<[EntityId]>();
 
 	/**

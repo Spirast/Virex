@@ -23,14 +23,7 @@ import type { Callback, IDisposable } from "./types";
  * ```
  */
 export class Event<T extends unknown[] = []> {
-	/**
-	 * Map of connection IDs to their associated callbacks
-	 */
 	private connections: Map<number, Callback<T>> = new Map();
-
-	/**
-	 * Counter for generating unique connection IDs
-	 */
 	private nextId = 0;
 
 	/**
