@@ -19,13 +19,13 @@ Virex is a modern ECS implementation designed specifically for Roblox game devel
 ## Installation
 
 ```bash
-npm install @rbxts/Virex
+npm install @rbxts/virex
 ```
 
 ## Quick Start
 
 ```typescript
-import { createWorld, component } from "@rbxts/Virex";
+import { createWorld, component } from "@rbxts/virex";
 
 // Define components
 const Position = component<{ x: number; y: number; z: number }>("Position");
