@@ -1,4 +1,4 @@
-# bJecs
+# VIREX
 
 A lightweight, high-performance Entity Component System (ECS) library for Roblox TypeScript (rbxts).
 
