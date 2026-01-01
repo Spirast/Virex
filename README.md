@@ -329,7 +329,7 @@ class Event<T extends unknown[] = []> {
 ### Basic Game Loop
 
 ```typescript
-import { createWorld, component } from "@rbxts/Virex";
+import { createWorld, component } from "@rbxts/virex";
 
 const Position = component<{ x: number; y: number; z: number }>("Position");
 const Velocity = component<{ x: number; y: number; z: number }>("Velocity");
